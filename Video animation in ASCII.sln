@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31612.314
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Video animation in ASCII", "Video animation in ASCII\Video animation in ASCII.csproj", "{6DBC9554-EAD1-4F65-95C2-DE9E604B0557}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6DBC9554-EAD1-4F65-95C2-DE9E604B0557}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6DBC9554-EAD1-4F65-95C2-DE9E604B0557}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6DBC9554-EAD1-4F65-95C2-DE9E604B0557}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6DBC9554-EAD1-4F65-95C2-DE9E604B0557}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B4591EF5-ADF3-42B0-96DB-337BD07B7371}
+	EndGlobalSection
+EndGlobal
