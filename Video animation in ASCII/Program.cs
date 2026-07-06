@@ -1,67 +1,100 @@
-﻿using System;
-using Accord.Video.FFMPEG;
-using System.Drawing;
-using System.Collections.Generic;
-using System.Linq;
 using System.Diagnostics;
 
-namespace Video_animation_in_ASCII
+namespace Video_animation_in_ASCII;
+
+internal static class Program
 {
-    class Program
+    // символы в терминале выше, чем шире — сжимаем кадр по вертикали
+    private const double HeightCompression = 2.0;
+    private const int DefaultMaxWidth = 150;
+
+    private static int Main(string[] args)
     {
-        // compression
-        private const double WIDTH_OFFSET = 1.5;
-        // width
-        private const int MAX_WIDTH = 150;
-        private static double frameRate;
-
-        static void Main(string[] args)
+        if (args.Length == 0)
         {
-            string path = @"C:\Users\vorob\Downloads\Bad Apple.mp4";
+            Console.Error.WriteLine("Использование: dotnet run -- <путь к видео> [ширина в символах]");
+            return 1;
+        }
 
-            Console.CursorVisible = false;
-            Console.ForegroundColor = ConsoleColor.Red;
-            VideoFileReader reader = new VideoFileReader();
-            reader.Open(path);
-            frameRate = reader.FrameRate.ToDouble();
-            List<List<string>> result = new List<List<string>>();
-            for (int i = 0; i < reader.FrameCount; i++)
+        string path = args[0];
+        if (!File.Exists(path))
+        {
+            Console.Error.WriteLine($"Файл не найден: {path}");
+            return 1;
+        }
+
+        int maxWidth = DefaultMaxWidth;
+        if (args.Length > 1 && (!int.TryParse(args[1], out maxWidth) || maxWidth <= 0))
+        {
+            Console.Error.WriteLine($"Некорректная ширина: {args[1]}");
+            return 1;
+        }
+
+        try
+        {
+            Play(path, maxWidth);
+            return 0;
+        }
+        catch (Exception e)
+        {
+            Console.Error.WriteLine(e.Message);
+            return 1;
+        }
+        finally
+        {
+            Console.CursorVisible = true;
+            Console.ResetColor();
+        }
+    }
+
+    private static void Play(string path, int maxWidth)
+    {
+        var reader = new FfmpegVideoReader { Path = path };
+        reader.Probe();
+
+        int width = Math.Min(maxWidth, reader.SourceWidth);
+        int height = Math.Max(1, (int)(reader.SourceHeight / HeightCompression * width / reader.SourceWidth));
+        var converter = new AsciiFrameConverter(width, height);
+
+        Console.CancelKeyPress += (_, _) =>
+        {
+            Console.CursorVisible = true;
+            Console.ResetColor();
+        };
+        Console.CursorVisible = false;
+
+        // Рендер: ffmpeg отдаёт уже отмасштабированные grayscale-кадры
+        var frames = new List<string>();
+        foreach (byte[] frame in reader.ReadFrames(width, height))
+        {
+            frames.Add(converter.Convert(frame));
+            if (frames.Count % 50 == 0 && reader.FrameCount > 0)
             {
-                Bitmap bitmap = reader.ReadVideoFrame();
-
-                bitmap = ResizeBitmap(bitmap);
-                bitmap.ToGrayscale();
-
-                var converter = new BitmapToASCIIConverter(bitmap);
-                result.Add(converter.Convert().Select(t => new string(t)).ToList());
-
-                Console.Write($"Рендер видео завершен на {((i * 100) / (double)reader.FrameCount).ToString("0.00")}%");
                 Console.SetCursorPosition(0, 0);
-
-            }
-            reader.Close();
-            Console.Clear();
-            Console.ForegroundColor = ConsoleColor.White;
-
-
-            foreach (var rows in result)
-            {
-                var frameTimeSW = Stopwatch.StartNew();
-                foreach (var row in rows)
-                    Console.WriteLine(row);
-                double timeToSleep = ((1.0 / frameRate) * 1000.0);
-                while (frameTimeSW.Elapsed.TotalMilliseconds < timeToSleep) ;
-                Console.SetCursorPosition(0, 0);
-                frameTimeSW.Stop();
+                Console.Write($"Рендер: {frames.Count * 100.0 / reader.FrameCount:0.0}% ({frames.Count}/{reader.FrameCount})");
             }
         }
-        private static Bitmap ResizeBitmap(Bitmap bitmap)
+
+        // Воспроизведение: темп держится по абсолютному времени, без накопления дрейфа
+        Console.Clear();
+        var output = new StreamWriter(Console.OpenStandardOutput(), Console.OutputEncoding, bufferSize: (width + 1) * height + 16)
         {
-            var maxWidth = MAX_WIDTH;
-            var maxHeight = bitmap.Height / WIDTH_OFFSET * maxWidth / bitmap.Width;
-            if (bitmap.Width > maxWidth || bitmap.Height > maxHeight)
-                bitmap = new Bitmap(bitmap, new Size(maxWidth, (int)maxHeight));
-            return bitmap;
+            AutoFlush = false,
+        };
+        double secondsPerFrame = 1.0 / reader.FrameRate;
+        var clock = Stopwatch.StartNew();
+        for (int i = 0; i < frames.Count; i++)
+        {
+            Console.SetCursorPosition(0, 0);
+            output.Write(frames[i]);
+            output.Flush();
+
+            var target = TimeSpan.FromSeconds((i + 1) * secondsPerFrame);
+            var remaining = target - clock.Elapsed;
+            if (remaining > TimeSpan.FromMilliseconds(2))
+                Thread.Sleep(remaining - TimeSpan.FromMilliseconds(1));
+            while (clock.Elapsed < target)
+                Thread.SpinWait(64);
         }
     }
 }
